@@ -28,7 +28,8 @@ A custom integration for Kia Uvo / Hyundai Bluelink. This project uses our under
 
 After installation, go to **Settings** → **Devices & Services** → **Integrations** and search for **Kia Uvo**. Configure your vehicle using your username and password.
 
-- AU, EU, CA, CH, IN, NZ, BR and US is supported. USA, India, China and Brazil support is limited.
+- AU, EU, CA, CH, IN, NZ, BR, ID and US is supported. USA, India, China and Brazil support is limited.
+- For Indonesia (Hyundai Bluelink), you can sign in directly with your username and password, or paste the OAuth2 redirect URL (https://apigw-ccs-ap.hyundai.com/api/v1/user/oauth2/redirect?code=...) or a refresh token into the password field as a fallback.
 - Genesis Support hasn't been tested and has just been added for Canada only. Feedback would be appreciated!
 - Multiple cars and accounts are supported. To add additional accounts just go through setup a second time.
 - Reconfigure flow is available from the integration options (change credentials or set PIN).
@@ -184,6 +185,6 @@ SVM entities and `capture_svm_image` are created only for vehicles that expose t
 
 If you receive an error while trying to login, please go through these steps:
 
-1. This integration supports USA, EU, China, India, Australia, New Zealand, Canada and Brazil. If you are outside these regions, you are welcome to create an issue and become a test user. USA and Brazil coverage is limited.
+1. This integration supports USA, EU, China, India, Australia, New Zealand, Canada, Brazil and Indonesia. If you are outside these regions, you are welcome to create an issue and become a test user. USA and Brazil coverage is limited.
 2. You can enable logging for this integration specifically and share your logs for investigation. To enable logging, click "Enable debug logging" on the integration. It can be accessed via **Settings → System → Logs**. See [Home Assistant troubleshooting: enabling debug logging](https://www.home-assistant.io/docs/configuration/troubleshooting/#enabling-debug-logging) for details.
 3. You can download a redacted diagnostics snapshot to attach to a bug report. Go to **Settings → Devices & Services → kia_uvo**, open the integration entry, click the menu (⋮) and select **Download diagnostics**. The dump is auto-redacted (tokens, device id, PIN, GPS coordinates, and reverse-geocoded addresses are removed) — safe to share. It contains the parsed vehicle state, API class, and version info, which helps diagnose field-mapping and region-specific issues.
