@@ -2,13 +2,9 @@
 
 from enum import StrEnum
 
-from .api_id import REGION_INDONESIA, REGION_INDONESIA_ID, register_indonesia_region
+import hyundai_kia_connect_api.const as api_const
 
-register_indonesia_region()
-
-from .api_id import register_indonesia_region
-
-register_indonesia_region()
+from .api_id import REGION_INDONESIA, REGION_INDONESIA_ID
 
 DOMAIN: str = "kia_uvo"
 
@@ -29,7 +25,8 @@ REGION_AUSTRALIA: str = "Australia"
 REGION_INDIA: str = "India"
 REGION_NZ: str = "New Zealand"
 REGION_BRAZIL: str = "Brazil"
-REGIONS = {
+REGIONS: dict[int, str] = {
+    **api_const.REGIONS,
     1: REGION_EUROPE,
     2: REGION_CANADA,
     3: REGION_USA,

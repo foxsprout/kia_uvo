@@ -41,6 +41,7 @@ from hyundai_kia_connect_api.exceptions import (
 )
 from hyundai_kia_connect_api.svm_image import render_views
 
+from .api_id import register_indonesia_region
 from .const import (
     CONF_BRAND,
     CONF_ENABLE_GEOLOCATION_ENTITY,
@@ -58,6 +59,8 @@ from .const import (
     DOMAIN,
     OffPeakChargingMode,
 )
+
+register_indonesia_region()
 
 _LOGGER = logging.getLogger(__name__)
 

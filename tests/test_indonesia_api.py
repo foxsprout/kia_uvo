@@ -58,8 +58,10 @@ def _make_mock_response(
 
 
 def test_region_registration() -> None:
-    """Indonesia region (10) is registered in both integration and API library."""
+    """Indonesia region (10) is registered alongside all original regions (1-9)."""
     register_indonesia_region()
+    for region_id in range(1, 10):
+        assert region_id in REGIONS
     assert REGIONS[REGION_INDONESIA_ID] == REGION_INDONESIA
     assert api_const.REGIONS[REGION_INDONESIA_ID] == REGION_INDONESIA
 
@@ -67,10 +69,14 @@ def test_region_registration() -> None:
         REGION_INDONESIA_ID, 2, "en"
     )
     assert isinstance(impl, HyundaiBlueLinkApiID)
+    assert impl.BASE_URL == "apigw-ccs-ap.hyundai.com"
 
     # Other regions still resolve through the original factory
     eu_impl = VehicleManager.get_implementation_by_region_brand(1, 2, "en")
     assert not isinstance(eu_impl, HyundaiBlueLinkApiID)
+    au_impl = VehicleManager.get_implementation_by_region_brand(5, 2, "en")
+    assert not isinstance(au_impl, HyundaiBlueLinkApiID)
+    assert au_impl.BASE_URL == "au-apigw.ccs.hyundai.com.au:8080"
 
 
 def test_indonesia_constants_and_headers() -> None:
@@ -533,14 +539,60 @@ def test_constructor_defaults_and_kwargs() -> None:
     )
     assert api_kwargs.BASE_URL == "apigw-ccs-ap.hyundai.com"
 
-    # Also verify _vehicle_from_spa_entry handles minimal vehicle dicts without KeyError
-    veh = api_default._vehicle_from_spa_entry({"vehicleId": "v-123"})
-    assert veh.id == "v-123"
-    assert veh.name == "v-123"
+    # Verify get_vehicles and _vehicle_from_spa_entry handle Indonesian UserVehicle
+    # payloads where "vin" is omitted without raising KeyError.
+    api_default.session = MagicMock()
+    api_default.session.get.return_value = _make_mock_response(
+        json_data={
+            "retCode": "S",
+            "resMsg": {
+                "vehicles": [
+                    {
+                        "vehicleId": "v-id-123",
+                        "vehicleName": "IONIQ 5",
+                        "nickname": "My IONIQ 5",
+                        "type": "EV",
+                        "year": "2024",
+                        "regDate": "20240501",
+                        "ccuCCS2ProtocolSupport": 1,
+                    }
+                ]
+            },
+        }
+    )
+    token = Token(
+        username="user@id.hyundai.com",
+        password="pw",
+        access_token="Bearer acc",
+        refresh_token="ref",
+        device_id="dev-1",
+        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        pin="1234",
+    )
+    vehicles = api_default.get_vehicles(token)
+    assert len(vehicles) == 1
+    assert vehicles[0].id == "v-id-123"
+    assert vehicles[0].name == "My IONIQ 5"
+    assert vehicles[0].model == "IONIQ 5"
+    assert vehicles[0].VIN == "v-id-123"
+    assert vehicles[0].year == 2024
+    assert vehicles[0].engine_type == ENGINE_TYPES.EV
+    assert vehicles[0].ccu_ccs2_protocol_support == 1
+
+    # Verify CCS2 update when DTE.Total is None and Location.TimeStamp has Year=0
+    api_default._update_vehicle_properties_ccs2(
+        vehicles[0],
+        {
+            "Drivetrain": {"Odometer": 1000.0, "FuelSystem": {"DTE": {"Total": None}}},
+            "Location": {"TimeStamp": {"Year": 0, "Month": 0, "Day": 0}},
+        },
+    )
+    assert vehicles[0].odometer == 1000.0
+    assert vehicles[0].total_driving_range is None
 
 
 def test_manifest_requirements_and_validate_input() -> None:
-    """Verify manifest.json has pycryptodome>=3.19.0 and validate_input handles Indonesia."""
+    """Verify manifest.json has pycryptodome>=3.19.0 and validate_input works cleanly."""
     import json
     from pathlib import Path
 
@@ -566,9 +618,16 @@ def test_manifest_requirements_and_validate_input() -> None:
 
     hass.async_add_executor_job = _run_sync
 
-    vm = MagicMock()
-    vm.api = None
-    vm.login.return_value = True
+    vm = VehicleManager(
+        region=REGION_INDONESIA_ID,
+        brand=2,
+        username="user@id.hyundai.com",
+        password="pw",
+        pin="1234",
+        language="en",
+    )
+    assert isinstance(vm.api, HyundaiBlueLinkApiID)
+    vm.login = MagicMock(return_value=True)
 
     coro = validate_input(
         hass,
@@ -583,4 +642,3 @@ def test_manifest_requirements_and_validate_input() -> None:
         raise AssertionError("Coroutine did not complete synchronously")
 
     assert result is True
-    assert isinstance(vm.api, HyundaiBlueLinkApiID)

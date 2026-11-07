@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 from collections.abc import Callable
 import contextlib
+import copy
 import datetime as dt
 import logging
 import math
@@ -25,12 +26,9 @@ from hyundai_kia_connect_api.ApiImplType1 import (
 )
 import hyundai_kia_connect_api.const as api_const
 from hyundai_kia_connect_api.const import (
-    BRAND_HYUNDAI,
-    BRANDS,
     CHARGE_PORT_ACTION,
     DOMAIN,
     ENGINE_TYPES,
-    ENGINE_TYPES_BY_VEHICLE_TYPE,
     SEAT_LOCATION,
 )
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
@@ -43,6 +41,17 @@ _LOGGER = logging.getLogger(__name__)
 
 REGION_INDONESIA: str = "Indonesia"
 REGION_INDONESIA_ID: int = 10
+
+_ENGINE_TYPES_BY_VEHICLE_TYPE: dict[str, ENGINE_TYPES] = {
+    "IC": ENGINE_TYPES.ICE,
+    "ICE": ENGINE_TYPES.ICE,
+    "GN": ENGINE_TYPES.ICE,
+    "EV": ENGINE_TYPES.EV,
+    "PHEV": ENGINE_TYPES.PHEV,
+    "PE": ENGINE_TYPES.PHEV,
+    "HEV": ENGINE_TYPES.HEV,
+    "HV": ENGINE_TYPES.HEV,
+}
 
 
 def _b64url_to_int(val: str) -> int:
@@ -137,22 +146,60 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
         headers = super()._get_authenticated_headers(token, ccs2_support)
         headers["offset"] = self.OFFSET
         headers["country"] = self.COUNTRY_CODE
+        if ccs2_support is not None:
+            headers["ccuCCS2ProtocolSupport"] = str(ccs2_support)
+            if ccs2_support != 0:
+                headers["clientId"] = self.CLIENT_ID
         return headers
 
     def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
-        return self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        if vehicle.ccu_ccs2_protocol_support and vehicle.id:
+            headers["vehicleId"] = vehicle.id
+        return headers
+
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Return the list of vehicles registered to the account."""
+        url = self.SPA_API_URL + "vehicles"
+        response = self.session.get(
+            url, headers=self._get_authenticated_headers(token)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
+        _check_response_for_errors(response)
+        res_msg = response.get("resMsg", {})
+        raw_vehicles = (
+            res_msg.get("vehicles", [])
+            if isinstance(res_msg, dict)
+            else (res_msg if isinstance(res_msg, list) else [])
+        )
+        return [self._vehicle_from_spa_entry(entry) for entry in raw_vehicles]
 
     def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
-        vehicle_type = entry.get("type") or entry.get("evType") or entry.get("fuelType")
+        detail_info = entry.get("detailInfo")
+        detail_dict = detail_info if isinstance(detail_info, dict) else {}
+        vehicle_type = (
+            entry.get("type")
+            or entry.get("evType")
+            or entry.get("fuelType")
+            or detail_dict.get("inCarType")
+        )
         vehicle_id = str(entry.get("vehicleId") or entry.get("id") or "")
         vehicle_name = str(
             entry.get("vehicleName")
+            or detail_dict.get("saleCarmdlEnNm")
             or entry.get("modelName")
             or entry.get("carName")
             or entry.get("nickname")
             or vehicle_id
         )
         nickname = str(entry.get("nickname") or vehicle_name)
+        year_val = entry.get("year") or entry.get("specYear")
+        year: int | None = None
+        if year_val is not None:
+            with contextlib.suppress(ValueError, TypeError):
+                year = int(year_val)
         return Vehicle(
             id=vehicle_id,
             name=nickname,
@@ -160,9 +207,10 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
             registration_date=str(
                 entry.get("regDate") or entry.get("enrollDate") or ""
             ),
-            VIN=str(entry.get("vin") or ""),
+            year=year,
+            VIN=str(entry.get("vin") or entry.get("vinNumber") or vehicle_id),
             timezone=self.data_timezone,
-            engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(
+            engine_type=_ENGINE_TYPES_BY_VEHICLE_TYPE.get(
                 str(vehicle_type) if vehicle_type is not None else ""
             ),
             ccu_ccs2_protocol_support=int(entry.get("ccuCCS2ProtocolSupport") or 0),
@@ -223,10 +271,18 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
             raise AuthenticationError(
                 f"Token response missing access_token: {response_json}"
             )
-        token_type = response_json.get("token_type", "Bearer")
-        access_token = f"{token_type} {response_json['access_token']}"
-        refresh_token = response_json.get("refresh_token") or fallback_refresh_token
-        expires_in = int(response_json.get("expires_in", 3600))
+        raw_access = str(response_json["access_token"]).strip()
+        if raw_access.lower().startswith("bearer "):
+            access_token = "Bearer " + raw_access[7:].strip()
+        else:
+            access_token = f"Bearer {raw_access}"
+        refresh_token = str(
+            response_json.get("refresh_token") or fallback_refresh_token
+        )
+        try:
+            expires_in = int(response_json.get("expires_in") or 3600)
+        except (ValueError, TypeError):
+            expires_in = 3600
         return access_token, refresh_token, expires_in
 
     def _exchange_authorization_code(self, code: str) -> tuple[str, str, int]:
@@ -326,7 +382,12 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
         """Fetch IDP JWK certificate and RSA PKCS1_v1_5 encrypt password."""
         certs_url = self.IDP_AUTH_API_URL + "v1/accounts/certs"
         response = self.session.get(certs_url).json()
-        key_data = response["keys"][0]
+        if isinstance(response.get("keys"), list) and response["keys"]:
+            key_data = response["keys"][0]
+        elif isinstance(response.get("retValue"), dict):
+            key_data = response["retValue"]
+        else:
+            key_data = response
         kid = cast(str, key_data["kid"])
         n = _b64url_to_int(key_data["n"])
         e = _b64url_to_int(key_data["e"])
@@ -514,6 +575,43 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
                 )
         return self.login(token.username, token.password, token.pin)
 
+    def _update_vehicle_properties_ccs2(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        """Update vehicle properties from CCS2 state, guarding nullable fields."""
+        sanitized = copy.deepcopy(state) if isinstance(state, dict) else {}
+        dte_total_missing = (
+            get_child_value(sanitized, "Drivetrain.FuelSystem.DTE.Total") is None
+        )
+        if dte_total_missing:
+            drivetrain = sanitized.setdefault("Drivetrain", {})
+            if isinstance(drivetrain, dict):
+                fuel_sys = drivetrain.setdefault("FuelSystem", {})
+                if isinstance(fuel_sys, dict):
+                    dte = fuel_sys.setdefault("DTE", {})
+                    if isinstance(dte, dict):
+                        dte["Total"] = 0
+
+        loc_ts = get_child_value(sanitized, "Location.TimeStamp")
+        if isinstance(loc_ts, dict):
+            year = loc_ts.get("Year")
+            month = loc_ts.get("Month")
+            day = loc_ts.get("Day")
+            if not year or not month or not day:
+                sanitized["Location"] = {
+                    k: v
+                    for k, v in sanitized.get("Location", {}).items()
+                    if k != "TimeStamp"
+                }
+
+        super()._update_vehicle_properties_ccs2(vehicle, sanitized)
+
+        if dte_total_missing:
+            if vehicle.engine_type == ENGINE_TYPES.EV:
+                vehicle._ev_driving_range = None
+            vehicle._total_driving_range = None
+        vehicle.data = state
+
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Fetch latest cached vehicle status (CCS2 or legacy)."""
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -525,15 +623,18 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
 
         response = self.session.get(
             url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
+            headers=self._get_vehicle_headers(token, vehicle),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
 
         if is_ccs2:
-            state = response["resMsg"]["state"]["Vehicle"]
+            res_msg = response.get("resMsg", {})
+            state = (
+                get_child_value(res_msg, "state.Vehicle")
+                or get_child_value(res_msg, "Vehicle")
+                or res_msg
+            )
             self._update_vehicle_properties_ccs2(vehicle, state)
             location = self._get_location(token, vehicle)
             if location and get_child_value(location, "coord.lat"):
@@ -611,39 +712,28 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
         return super().charge_port_action(token, vehicle, action)
 
 
-_ORIGINAL_GET_IMPLEMENTATION: Callable[..., Any] | None = None
+_original_get_implementation: Callable[..., Any] = (
+    VehicleManager.get_implementation_by_region_brand
+)
+
+
+def _get_implementation_by_region_brand(
+    region: int = REGION_INDONESIA_ID,
+    brand: int = 1,
+    language: str = "en",
+    **kwargs: Any,
+) -> Any:
+    """Return HyundaiBlueLinkApiID for Indonesia (region 10) or delegate to original."""
+    if int(region) == REGION_INDONESIA_ID:
+        return HyundaiBlueLinkApiID(
+            region=int(region), brand=int(brand), language=language, **kwargs
+        )
+    return _original_get_implementation(region, brand, language)
 
 
 def register_indonesia_region() -> None:
     """Register Indonesia region in hyundai_kia_connect_api."""
-    global _ORIGINAL_GET_IMPLEMENTATION
     api_const.REGIONS[REGION_INDONESIA_ID] = REGION_INDONESIA
-
-    if _ORIGINAL_GET_IMPLEMENTATION is not None:
-        return
-
-    _ORIGINAL_GET_IMPLEMENTATION = VehicleManager.get_implementation_by_region_brand
-
-    def _get_implementation_by_region_brand(
-        region: int = REGION_INDONESIA_ID,
-        brand: int = 1,
-        language: str = "en",
-        **kwargs: Any,
-    ) -> Any:
-        if (
-            int(region) == REGION_INDONESIA_ID
-            or api_const.REGIONS.get(region) == REGION_INDONESIA
-        ):
-            if BRANDS.get(brand) == BRAND_HYUNDAI:
-                return HyundaiBlueLinkApiID(
-                    region=int(region), brand=int(brand), language=language, **kwargs
-                )
-            return HyundaiBlueLinkApiID(
-                region=int(region), brand=int(brand), language=language, **kwargs
-            )
-        assert _ORIGINAL_GET_IMPLEMENTATION is not None
-        return _ORIGINAL_GET_IMPLEMENTATION(region, brand, language)
-
     VehicleManager.get_implementation_by_region_brand = staticmethod(  # type: ignore[method-assign]
         _get_implementation_by_region_brand
     )

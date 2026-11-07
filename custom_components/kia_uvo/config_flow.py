@@ -24,7 +24,7 @@ from hyundai_kia_connect_api.const import OTP_NOTIFY_TYPE
 from hyundai_kia_connect_api.exceptions import AuthenticationError
 import voluptuous as vol
 
-from .api_id import REGION_INDONESIA_ID, HyundaiBlueLinkApiID, register_indonesia_region
+from .api_id import register_indonesia_region
 from .const import (
     BRANDS,
     CONF_BRAND,
@@ -42,9 +42,10 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_USE_EMAIL_WITH_GEOCODE_API,
     DOMAIN,
-    REGION_INDONESIA,
     REGIONS,
 )
+
+register_indonesia_region()
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,21 +140,6 @@ async def validate_input(
 ) -> bool | OTPRequest:
     """Validate the user input allows us to connect."""
     try:
-        region_val = user_input.get(CONF_REGION)
-        if region_val is not None and (
-            int(region_val) == REGION_INDONESIA_ID
-            or REGIONS.get(int(region_val)) == REGION_INDONESIA
-        ):
-            register_indonesia_region()
-            if not isinstance(
-                getattr(vehicle_manager, "api", None), HyundaiBlueLinkApiID
-            ):
-                vehicle_manager.api = HyundaiBlueLinkApiID(
-                    region=int(region_val),
-                    brand=int(user_input.get(CONF_BRAND, 1)),
-                    language=getattr(getattr(hass, "config", None), "language", "en"),
-                )
-
         result = await hass.async_add_executor_job(vehicle_manager.login)
 
         if not result:
@@ -236,16 +222,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             assert self._region_data is not None
             # Combine region data with credentials
             full_config = {**self._region_data, **user_input}
+            self._vehicle_manager = VehicleManager(
+                region=full_config[CONF_REGION],
+                brand=full_config[CONF_BRAND],
+                language=self.hass.config.language,
+                username=full_config[CONF_USERNAME],
+                password=full_config[CONF_PASSWORD],
+                pin=full_config[CONF_PIN],
+            )
             try:
-                register_indonesia_region()
-                self._vehicle_manager = VehicleManager(
-                    region=full_config[CONF_REGION],
-                    brand=full_config[CONF_BRAND],
-                    language=self.hass.config.language,
-                    username=full_config[CONF_USERNAME],
-                    password=full_config[CONF_PASSWORD],
-                    pin=full_config[CONF_PIN],
-                )
                 result = await validate_input(
                     self.hass, full_config, self._vehicle_manager
                 )
@@ -375,16 +360,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             assert self._region_data is not None
             # Combine region data with credentials
             full_config = {**self._region_data, **user_input}
+            self._vehicle_manager = VehicleManager(
+                region=full_config[CONF_REGION],
+                brand=full_config[CONF_BRAND],
+                language=self.hass.config.language,
+                username=full_config[CONF_USERNAME],
+                password=full_config[CONF_PASSWORD],
+                pin=full_config[CONF_PIN],
+            )
             try:
-                register_indonesia_region()
-                self._vehicle_manager = VehicleManager(
-                    region=full_config[CONF_REGION],
-                    brand=full_config[CONF_BRAND],
-                    language=self.hass.config.language,
-                    username=full_config[CONF_USERNAME],
-                    password=full_config[CONF_PASSWORD],
-                    pin=full_config[CONF_PIN],
-                )
                 await validate_input(self.hass, full_config, self._vehicle_manager)
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
