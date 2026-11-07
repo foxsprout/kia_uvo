@@ -1,3 +1,7 @@
+Vibe-coded using antigravity to add Indonesian Bluelink login through reverse-engineering Android APKS file
+
+---Original Kia-Uvo descriptions below---
+
 <img src="https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.kia_uvo.total">
 
 ## Code Maintainers Wanted
@@ -29,7 +33,7 @@ A custom integration for Kia Uvo / Hyundai Bluelink. This project uses our under
 After installation, go to **Settings** → **Devices & Services** → **Integrations** and search for **Kia Uvo**. Configure your vehicle using your username and password.
 
 - AU, EU, CA, CH, IN, NZ, BR and US is supported. USA, India, China and Brazil support is limited.
-- Genesis Support hasn't been tested and has just been added for Canada only. Feedback would be appreciated!
+- Genesis Support on the Europe (Beta) region: authentication is live-verified, vehicle reads and remote control follow as they are verified with real vehicles. Genesis Support on Canada is still untested. Feedback would be appreciated!
 - Multiple cars and accounts are supported. To add additional accounts just go through setup a second time.
 - Reconfigure flow is available from the integration options (change credentials or set PIN).
 - Scan Interval - fetches cached information from servers every 30 minutes. **Configurable**
