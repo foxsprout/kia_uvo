@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <img src="https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.kia_uvo.total">
 
 ## Code Maintainers Wanted
@@ -188,3 +189,198 @@ If you receive an error while trying to login, please go through these steps:
 1. This integration supports USA, EU, China, India, Australia, New Zealand, Canada, Brazil and Indonesia. If you are outside these regions, you are welcome to create an issue and become a test user. USA and Brazil coverage is limited.
 2. You can enable logging for this integration specifically and share your logs for investigation. To enable logging, click "Enable debug logging" on the integration. It can be accessed via **Settings → System → Logs**. See [Home Assistant troubleshooting: enabling debug logging](https://www.home-assistant.io/docs/configuration/troubleshooting/#enabling-debug-logging) for details.
 3. You can download a redacted diagnostics snapshot to attach to a bug report. Go to **Settings → Devices & Services → kia_uvo**, open the integration entry, click the menu (⋮) and select **Download diagnostics**. The dump is auto-redacted (tokens, device id, PIN, GPS coordinates, and reverse-geocoded addresses are removed) — safe to share. It contains the parsed vehicle state, API class, and version info, which helps diagnose field-mapping and region-specific issues.
+=======
+Vibe-coded using antigravity to add Indonesian Bluelink login through reverse-engineering Android APKS file
+
+---Original Kia-Uvo descriptions below---
+
+<img src="https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.kia_uvo.total">
+
+## Code Maintainers Wanted
+
+I no longer have a Kia or Hyundai so don't maintain this like I used to. Others who are interested in jumping in are welcome to join the project! Even just pull requests are appreciated!
+
+## Intro
+
+A custom integration for Kia Uvo / Hyundai Bluelink. This project uses our underlying python package: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api.
+
+## Installation
+
+### HACS
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Hyundai-Kia-Connect&repository=kia_uvo&category=integration)
+
+1. Install [HACS](https://hacs.xyz/) if you don't have it already
+2. Open HACS in Home Assistant
+3. Search for "Kia Uvo"
+4. Click the download button
+
+### Manual
+
+1. Copy the `custom_components/kia_uvo` directory to your `config/custom_components/` directory
+2. Restart Home Assistant
+
+### Configuration
+
+After installation, go to **Settings** → **Devices & Services** → **Integrations** and search for **Kia Uvo**. Configure your vehicle using your username and password.
+
+- AU, EU, CA, CH, IN, NZ, BR and US is supported. USA, India, China and Brazil support is limited.
+- Genesis Support on the Europe (Beta) region: authentication is live-verified, vehicle reads and remote control follow as they are verified with real vehicles. Genesis Support on Canada is still untested. Feedback would be appreciated!
+- Multiple cars and accounts are supported. To add additional accounts just go through setup a second time.
+- Reconfigure flow is available from the integration options (change credentials or set PIN).
+- Scan Interval - fetches cached information from servers every 30 minutes. **Configurable**
+- Force Refresh Interval - asks your car for the latest data every 4 hours. **Configurable**
+- Force Refresh is disabled between 10PM and 6AM by default. **Configurable**
+- By default, distance unit is based on HA metric/imperial preference, you need to configure each entity if you would like other units.
+
+## Supported entities
+
+### Sensors
+
+- Odometer, Total Range, EV Range, Fuel Range
+- Car Battery Level (12v), EV Battery Level, EV Battery SOH, EV Battery Capacity, EV Battery Remain
+- Estimated Charge Duration (current, fast, portable, station)
+- EV Target Range (AC/DC charge)
+- Air Temperature, Outside Temperature
+- Fuel Level
+- Total Power Consumed/Regenerated, Power Consumption 30d
+- Front/Rear Seat Status and Heater
+- Last Service Distance, Next Service Distance
+- Engine Type, DTC Count
+- EV Charging Power, EV Charging Current
+- Geocoded Location (optional, disabled by default)
+- Location Last Updated
+- Daily Driving Stats, Today's Daily Driving Stats
+- SVM Status (time of the last surround-view capture)
+
+### EV Diagnostics (CCS2 vehicles)
+
+- EV Battery Pack Voltage
+- EV Battery Temperature (min, max, water)
+- EV Battery Chiller RPM
+- EV Power Consumption (air conditioning, battery cooling, battery heater)
+- EV Off-Peak Start/End Time, EV Departure Time (first/second)
+
+### Binary Sensors
+
+- Engine Running, Ignition, Accessory Status
+- Defrost, Heated Rear Window, Heated Steering Wheel, Side Mirror Heater
+- EV Battery Charging, EV Battery Plugged In, EV Charge Port Open
+- EV Battery Winter Mode, EV Battery Precondition Enabled, EV Battery Heating State
+- EV V2L/V2X Status
+- EV Schedule Charge Enabled, EV Off-Peak Charge Only Enabled
+- Door Open/Close (individual doors), Trunk, Hood
+- Window Open/Close (individual windows)
+- Lock Status (individual doors)
+- Tire Pressure Warnings (individual and all)
+- Low Fuel Light, Smart Key Battery Warning
+- Brake Fluid Warning, Washer Fluid Warning
+- Headlamp Status, Turn Signals, Stop Lamps
+- Sunroof Open, Sleep Mode
+- Transmission Condition
+
+### Switches
+
+- Climate Control
+- EV Charging
+- Charge Port (open/close)
+- Valet Mode
+- Scheduled Charging
+- Off-Peak Charge Only
+- EV Scheduled Departure 1 / 2 — enable, climate and defrost toggles (EVs with departure schedules)
+- SVM Dewarp — rectifies the SVM fisheye camera views (presentation preference only; no vehicle command)
+
+### Number Entities
+
+- EV Charge Limits (AC/DC)
+- EV V2L Discharge Limit
+
+### Covers
+
+- Individual Window Control (front left, front right, rear left, rear right) — where supported
+
+### Locks
+
+- Door Lock/Unlock
+
+### Climate
+
+- Climate Control (temperature, mode, defrost)
+
+### Buttons
+
+- Force Refresh
+- Start Hazard Lights / Start Hazard Lights and Horn
+- Start Valet Mode / Stop Valet Mode
+- Open All Windows / Close All Windows / Vent All Windows
+- Capture SVM Image (triggers a fresh surround-view capture — a remote command that can wake the vehicle)
+
+### Image Entities
+
+SVM / 360° surround view, where the vehicle supports it (Hyundai only):
+
+- SVM Front Camera, SVM Rear Camera, SVM Left Camera, SVM Right Camera — the side-camera views cropped from the latest capture
+- SVM Bird's-eye View — the top-down view
+- The side cameras are raw fisheye output; the **SVM Dewarp** switch (under Switches) rectifies them using the per-camera field of view when the API provides it, and falls back to the raw fisheye otherwise
+- Views are cropped, rectified and encoded by the library (`hyundai_kia_connect_api[image]`); the **SVM Dewarp** switch refreshes the image entities immediately — no new capture needed
+
+### Device Tracker
+
+- Vehicle Location (GPS)
+
+## Supported services
+
+These can be accessed via Developer Tools > Actions, or called from automations.
+
+- `update`: get latest **cached** vehicle data
+- `force_update`: ask the vehicle for its latest data — do not overuse!
+- `start_climate` / `stop_climate`: start/stop climate control (starts ICE engine in some regions)
+- `start_charge` / `stop_charge`: control EV charging
+- `set_charge_limits`: set AC/DC charge capacity limits
+- `set_charging_current`: set charging current level (100%, 90% or 60%)
+- `open_charge_port` / `close_charge_port`: open or close the charge port
+- `lock` / `unlock`: lock or unlock the vehicle
+- `set_windows`: open/close individual windows (where supported)
+- `start_hazard_lights` / `stop_hazard_lights`: hazard lights only
+- `start_hazard_lights_and_horn` / `stop_hazard_lights_and_horn`: panic mode
+- `schedule_charging_and_climate`: set planned departure schedule
+- `set_off_peak_charging`: set the off-peak charging mode and window (EVs)
+- `start_valet_mode` / `stop_valet_mode`: valet mode
+- `set_navigation`: send a destination to the vehicle's navigation system
+- `capture_svm_image`: trigger a fresh SVM / surround-view capture
+
+### Service availability by region
+
+| Service                       | EU  | EU(>2023), NZ, AU | CA  | USA Kia | USA Hyundai | USA Genesis | China | India | Brazil |
+| ----------------------------- | --- | ----------------- | --- | ------- | ----------- | ----------- | ----- | ----- | ------ |
+| Update                        | ✔   | ✔                 | ✔   | ✔       | ✔           | ✔           | ✔     | ✔     | ✔      |
+| Force Update                  | ✔   | not tested        | ✔   | ✔       |             |             | ✔     | ✔     | ✔      |
+| Lock / Unlock                 | ✔   | ✔                 | ✔   | ✔       | ✔           | ✔           | ✔     | ✔     | ✖      |
+| Start / Stop Climate          | ✔   | ✔                 | ✔   | ✔       | ✔           |             | ✔     | ✔     | ✖      |
+| Start / Stop Charge           | ✔   | ✔                 | ✔   | ✔       | ✔           |             |       |       | ✖      |
+| Set Charge Limits             | ✔   | ✔                 | ✔   | ✔       | ✔           |             |       |       | ✖      |
+| Set Charging Current          | ✔   | ✔                 | ✔   | ✔       | ✔           |             |       |       | ✖      |
+| Open / Close Charge Port      | ✖   | ✔                 | ✖   | ✖       | ✖           | ✖           | ✖     |       | ✖      |
+| Set Windows                   | ✖   | ✔                 | ✖   | ✖       | ✖           | ✖           | ✖     |       | ✖      |
+| Start / Stop Hazard Lights    | ✖   | ✔                 | ✖   | ✖       | ✖           | ✖           | ✖     |       | ✖      |
+| Start / Stop Hazard + Horn    | ✖   | ✔                 | ✖   | ✖       | ✖           | ✖           | ✖     | ✔     | ✖      |
+| Schedule Charging and Climate | ✖   | ✔                 | ✖   | ✖       | ✖           | ✖           | ✖     |       | ✖      |
+| Start / Stop Valet Mode       | ✖   | ✔                 | ✖   | ✖       | ✖           | ✖           | ✖     |       | ✖      |
+| Set Navigation                |     | ✔                 |     |         |             |             |       |       |        |
+| Capture SVM Image (Hyundai)   | ✔   |                   |     |         | ✔           |             |       |       |        |
+
+SVM entities and `capture_svm_image` are created only for vehicles that expose the surround-view capability (Hyundai).
+
+## Screenshots
+
+![Device Details](https://github.com/Hyundai-Kia-Connect/kia_uvo/blob/master/Device%20Details.PNG?raw=true)
+![Configuration](https://github.com/Hyundai-Kia-Connect/kia_uvo/blob/master/Configuration.PNG?raw=true)
+
+## Troubleshooting
+
+If you receive an error while trying to login, please go through these steps:
+
+1. This integration supports USA, EU, China, India, Australia, New Zealand, Canada and Brazil. If you are outside these regions, you are welcome to create an issue and become a test user. USA and Brazil coverage is limited.
+2. You can enable logging for this integration specifically and share your logs for investigation. To enable logging, click "Enable debug logging" on the integration. It can be accessed via **Settings → System → Logs**. See [Home Assistant troubleshooting: enabling debug logging](https://www.home-assistant.io/docs/configuration/troubleshooting/#enabling-debug-logging) for details.
+3. You can download a redacted diagnostics snapshot to attach to a bug report. Go to **Settings → Devices & Services → kia_uvo**, open the integration entry, click the menu (⋮) and select **Download diagnostics**. The dump is auto-redacted (tokens, device id, PIN, GPS coordinates, and reverse-geocoded addresses are removed) — safe to share. It contains the parsed vehicle state, API class, and version info, which helps diagnose field-mapping and region-specific issues.
+>>>>>>> 4e995fa283d0bdf5a361db7851c8a1cefb0c7306
