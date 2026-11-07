@@ -30,6 +30,7 @@ from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
     DOMAIN,
     ENGINE_TYPES,
+    ENGINE_TYPES_BY_VEHICLE_TYPE,
     SEAT_LOCATION,
 )
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
@@ -99,9 +100,16 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
     OFFSET: str = "7"
     PUSH_TYPE: str = "GCM"
 
-    def __init__(self, region: int, brand: int, language: str) -> None:
+    def __init__(
+        self,
+        region: int = 10,
+        brand: int = 1,
+        language: str = "en",
+        **kwargs: Any,
+    ) -> None:
         """Initialize the Indonesia API client."""
-        super().__init__(region, brand, language)
+        api_const.REGIONS.setdefault(region, REGION_INDONESIA)
+        super().__init__(region=region, brand=brand, language=language)
         self.LANGUAGE = language
         self.BASE_URL = "apigw-ccs-ap.hyundai.com"
         self.USER_API_URL = "https://" + self.BASE_URL + "/api/v1/user/"
@@ -133,6 +141,32 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
 
     def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         return self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        vehicle_type = entry.get("type") or entry.get("evType") or entry.get("fuelType")
+        vehicle_id = str(entry.get("vehicleId") or entry.get("id") or "")
+        vehicle_name = str(
+            entry.get("vehicleName")
+            or entry.get("modelName")
+            or entry.get("carName")
+            or entry.get("nickname")
+            or vehicle_id
+        )
+        nickname = str(entry.get("nickname") or vehicle_name)
+        return Vehicle(
+            id=vehicle_id,
+            name=nickname,
+            model=vehicle_name,
+            registration_date=str(
+                entry.get("regDate") or entry.get("enrollDate") or ""
+            ),
+            VIN=str(entry.get("vin") or ""),
+            timezone=self.data_timezone,
+            engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(
+                str(vehicle_type) if vehicle_type is not None else ""
+            ),
+            ccu_ccs2_protocol_support=int(entry.get("ccuCCS2ProtocolSupport") or 0),
+        )
 
     def _get_device_id(self, stamp: str) -> str:
         my_hex = f"{random.randrange(10**80):064x}"
@@ -396,6 +430,7 @@ class HyundaiBlueLinkApiID(KiaUvoApiAU):
         username: str,
         password: str,
         pin: str | None = None,
+        **kwargs: Any,
     ) -> Token:
         """Log in to Hyundai Bluelink Indonesia.
 
@@ -590,15 +625,28 @@ def register_indonesia_region() -> None:
     _ORIGINAL_GET_IMPLEMENTATION = VehicleManager.get_implementation_by_region_brand
 
     def _get_implementation_by_region_brand(
-        region: int, brand: int, language: str
+        region: int = REGION_INDONESIA_ID,
+        brand: int = 1,
+        language: str = "en",
+        **kwargs: Any,
     ) -> Any:
-        if api_const.REGIONS.get(region) == REGION_INDONESIA:
+        if (
+            int(region) == REGION_INDONESIA_ID
+            or api_const.REGIONS.get(region) == REGION_INDONESIA
+        ):
             if BRANDS.get(brand) == BRAND_HYUNDAI:
-                return HyundaiBlueLinkApiID(region, brand, language)
-            return HyundaiBlueLinkApiID(region, brand, language)
+                return HyundaiBlueLinkApiID(
+                    region=int(region), brand=int(brand), language=language, **kwargs
+                )
+            return HyundaiBlueLinkApiID(
+                region=int(region), brand=int(brand), language=language, **kwargs
+            )
         assert _ORIGINAL_GET_IMPLEMENTATION is not None
         return _ORIGINAL_GET_IMPLEMENTATION(region, brand, language)
 
     VehicleManager.get_implementation_by_region_brand = staticmethod(  # type: ignore[method-assign]
         _get_implementation_by_region_brand
     )
+
+
+register_indonesia_region()

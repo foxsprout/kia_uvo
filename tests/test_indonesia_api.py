@@ -517,3 +517,70 @@ def test_remote_controls_ccs2_and_legacy() -> None:
     msg_id = api.start_climate(token, legacy_vehicle, opts)
     assert msg_id == "msg-1"
     assert opts.set_temp == 17.0
+
+
+def test_constructor_defaults_and_kwargs() -> None:
+    """HyundaiBlueLinkApiID can be initialized with or without positional/keyword args."""
+    api_default = HyundaiBlueLinkApiID()
+    assert api_default.BASE_URL == "apigw-ccs-ap.hyundai.com"
+    assert api_default.LANGUAGE == "en"
+
+    api_pos = HyundaiBlueLinkApiID(10, 1, "id")
+    assert api_pos.LANGUAGE == "id"
+
+    api_kwargs = HyundaiBlueLinkApiID(
+        region=10, brand=2, language="en", extra_arg="ignored"
+    )
+    assert api_kwargs.BASE_URL == "apigw-ccs-ap.hyundai.com"
+
+    # Also verify _vehicle_from_spa_entry handles minimal vehicle dicts without KeyError
+    veh = api_default._vehicle_from_spa_entry({"vehicleId": "v-123"})
+    assert veh.id == "v-123"
+    assert veh.name == "v-123"
+
+
+def test_manifest_requirements_and_validate_input() -> None:
+    """Verify manifest.json has pycryptodome>=3.19.0 and validate_input handles Indonesia."""
+    import json
+    from pathlib import Path
+
+    from homeassistant.const import CONF_REGION
+
+    from custom_components.kia_uvo.config_flow import validate_input
+    from custom_components.kia_uvo.const import CONF_BRAND
+
+    manifest_path = (
+        Path(__file__).resolve().parents[1]
+        / "custom_components"
+        / "kia_uvo"
+        / "manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert "pycryptodome>=3.19.0" in manifest["requirements"]
+
+    hass = MagicMock()
+    hass.config.language = "en"
+
+    async def _run_sync(func: Any, *args: Any) -> Any:
+        return func(*args)
+
+    hass.async_add_executor_job = _run_sync
+
+    vm = MagicMock()
+    vm.api = None
+    vm.login.return_value = True
+
+    coro = validate_input(
+        hass,
+        {CONF_REGION: REGION_INDONESIA_ID, CONF_BRAND: 2},
+        vm,
+    )
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        result = stop.value
+    else:
+        raise AssertionError("Coroutine did not complete synchronously")
+
+    assert result is True
+    assert isinstance(vm.api, HyundaiBlueLinkApiID)

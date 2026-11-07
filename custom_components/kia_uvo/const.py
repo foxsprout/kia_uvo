@@ -6,11 +6,7 @@ from .api_id import REGION_INDONESIA, REGION_INDONESIA_ID, register_indonesia_re
 
 register_indonesia_region()
 
-from .api_id import (
-    REGION_INDONESIA,
-    REGION_INDONESIA_ID,
-    register_indonesia_region,
-)
+from .api_id import register_indonesia_region
 
 register_indonesia_region()
 
